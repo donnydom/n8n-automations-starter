@@ -1,0 +1,191 @@
+{
+  "name": "Email Automation Template",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * 1"
+            }
+          ]
+        }
+      },
+      "name": "Monday Morning Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "sheetId": "your-contacts-sheet-id",
+        "range": "Contacts!A:E",
+        "options": {}
+      },
+      "name": "Get Contact List",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 3,
+      "position": [450, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1",
+          "name": "Google Sheets API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.status }}",
+              "operation": "equals",
+              "value2": "active"
+            },
+            {
+              "value1": "={{ $json.email }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        },
+        "combineOperation": "all"
+      },
+      "name": "Filter Active Contacts",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Personalize email content\nconst items = [];\n\nfor (const item of $input.all()) {\n  const firstName = item.json.name?.split(' ')[0] || 'there';\n  \n  items.push({\n    json: {\n      ...item.json,\n      subject: `Weekly Update for ${firstName}`,\n      greeting: `Hi ${firstName},`,\n      personalized_content: `Hope you're having a great week! Here's your personalized update.`\n    }\n  });\n}\n\nreturn items;"
+      },
+      "name": "Personalize Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 200]
+    },
+    {
+      "parameters": {
+        "fromEmail": "noreply@yourdomain.com",
+        "toEmail": "={{ $json.email }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "message": "=<html>\n<body>\n  <h2>{{ $json.greeting }}</h2>\n  <p>{{ $json.personalized_content }}</p>\n  <p>Best regards,<br>Your Team</p>\n  <hr>\n  <small>You're receiving this because you subscribed to our updates.</small>\n</body>\n</html>",
+        "options": {}
+      },
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [1050, 200],
+      "credentials": {
+        "smtp": {
+          "id": "2",
+          "name": "SMTP Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 1,
+        "unit": "seconds"
+      },
+      "name": "Wait Between Emails",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1250, 200]
+    },
+    {
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "sheetId": "your-log-sheet-id",
+        "range": "EmailLog!A:C",
+        "options": {}
+      },
+      "name": "Log Sent Email",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 3,
+      "position": [1450, 200],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1",
+          "name": "Google Sheets API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Monday Morning Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Contact List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Contact List": {
+      "main": [
+        [
+          {
+            "node": "Filter Active Contacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Active Contacts": {
+      "main": [
+        [
+          {
+            "node": "Personalize Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Personalize Content": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email": {
+      "main": [
+        [
+          {
+            "node": "Wait Between Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Between Emails": {
+      "main": [
+        [
+          {
+            "node": "Log Sent Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "tags": []
+}
